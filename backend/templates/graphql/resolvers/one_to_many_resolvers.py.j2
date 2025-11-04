@@ -1,0 +1,58 @@
+from ariadne import ObjectType
+from sqlalchemy import select
+{{ parent_import_line }}
+{{ child_import_line }}
+
+def mount_one_to_many_resolvers():
+    query = ObjectType("Query")
+    mutation = ObjectType("Mutation")
+    parent = ObjectType("{{ Parent }}")
+    child = ObjectType("{{ Child }}")
+
+    @query.field("{{ parents_field }}")
+    async def resolve_parents(*_, offset: int = 0, limit: int = 50):
+        session = _[1].context["session"]
+        res = await session.execute(select(ParentModel).offset(offset).limit(limit))
+        return res.scalars().all()
+
+    @query.field("{{ parent_field_singular }}")
+    async def resolve_parent(*_, id: str):
+        session = _[1].context["session"]
+        res = await session.execute(select(ParentModel).where(ParentModel.id == id))
+        return res.scalar_one_or_none()
+
+    @parent.field("{{ children_field }}")
+    async def resolve_children(obj, info, offset: int = 0, limit: int = 50):
+        session = info.context["session"]
+        res = await session.execute(
+            select(ChildModel).where(ChildModel.{{ parent_fk }} == obj.id).offset(offset).limit(limit)
+        )
+        return res.scalars().all()
+
+    @child.field("{{ parent_field }}")
+    async def resolve_parent_rel(obj, info):
+        session = info.context["session"]
+        res = await session.execute(select(ParentModel).where(ParentModel.id == obj.{{ parent_fk }}))
+        return res.scalar_one_or_none()
+
+    @mutation.field("{{ attach_field }}")
+    async def attach_child(*_, parentId: str, childId: str):
+        session = _[1].context["session"]
+        res = await session.execute(select(ChildModel).where(ChildModel.id == childId))
+        c = res.scalar_one_or_none()
+        c.{{ parent_fk }} = parentId
+        await session.flush()
+        return c
+
+    @mutation.field("{{ detach_field }}")
+    async def detach_child(*_, childId: str):
+        session = _[1].context["session"]
+        res = await session.execute(select(ChildModel).where(ChildModel.id == childId))
+        c = res.scalar_one_or_none()
+        if not c:
+            return False
+        c.{{ parent_fk }} = None
+        await session.flush()
+        return True
+
+    return query, mutation, parent, child

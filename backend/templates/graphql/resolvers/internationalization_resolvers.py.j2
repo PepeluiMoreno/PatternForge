@@ -1,0 +1,35 @@
+from ariadne import ObjectType
+from sqlalchemy import select
+{{ entity_import_line }}
+{{ translation_import_line }}
+
+def mount_internationalization_resolvers():
+    mutation = ObjectType("Mutation")
+    entity = ObjectType("{{ Entity }}")
+
+    @entity.field("translations")
+    async def resolve_translations(obj, info, locale: str):
+        session = info.context["session"]
+        res = await session.execute(select({{ TranslationModel }}).where(
+            ({{ TranslationModel }}.entity_id == obj.id) & ({{ TranslationModel }}.locale == locale)
+        ))
+        return res.scalar_one_or_none()
+
+    @mutation.field("{{ upsert_translation_field }}")
+    async def upsert_translation(*_, entityId: str, locale: str, input: dict):
+        session = _[1].context["session"]
+        res = await session.execute(select({{ TranslationModel }}).where(
+            ({{ TranslationModel }}.entity_id == entityId) & ({{ TranslationModel }}.locale == locale)
+        ))
+        row = res.scalar_one_or_none()
+        if row is None:
+            obj = {{ TranslationModel }}(entity_id=entityId, locale=locale, **input)
+            session.add(obj)
+            await session.flush()
+            return obj
+        for k, v in input.items():
+            setattr(row, k, v)
+        await session.flush()
+        return row
+
+    return mutation, entity

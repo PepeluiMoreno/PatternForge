@@ -1,0 +1,23 @@
+type {{ Entity }} {
+  id: ID!
+  {% for f in base_fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+  translations(locale: String!): {{ EntityTranslation }}
+}
+
+type {{ EntityTranslation }} {
+  id: ID!
+  entityId: ID!
+  locale: String!
+  {% for f in translatable_fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+}
+
+extend type Mutation {
+  {{ upsert_translation_field }}(entityId: ID!, locale: String!, input: {{ EntityTranslationInput }}!): {{ EntityTranslation }}!
+}
+
+input {{ EntityTranslationInput }} {
+  {% for f in translatable_fields %}{{ f.name }}: {{ f.inputType }}
+  {% endfor %}
+}

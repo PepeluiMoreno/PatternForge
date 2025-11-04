@@ -1,0 +1,49 @@
+from ariadne import ObjectType
+from sqlalchemy import select, insert
+{{ audited_import_line }}
+{{ history_import_line }}
+
+def mount_audit_versioning_resolvers():
+    query = ObjectType("Query")
+    mutation = ObjectType("Mutation")
+    node = ObjectType("{{ AuditedEntity }}")
+
+    @query.field("{{ audited_entities_field }}")
+    async def resolve_list(*_, offset: int = 0, limit: int = 50):
+        session = _[1].context["session"]
+        res = await session.execute(select({{ AuditedModel }}).offset(offset).limit(limit))
+        return res.scalars().all()
+
+    @query.field("{{ audited_entity_field }}")
+    async def resolve_single(*_, id: str):
+        session = _[1].context["session"]
+        res = await session.execute(select({{ AuditedModel }}).where({{ AuditedModel }}.id == id))
+        return res.scalar_one_or_none()
+
+    @node.field("history")
+    async def resolve_history(obj, info, offset: int = 0, limit: int = 50):
+        session = info.context["session"]
+        res = await session.execute(
+            select({{ HistoryModel }}).where({{ HistoryModel }}.entity_id == obj.id).order_by({{ HistoryModel }}.version.desc()).offset(offset).limit(limit)
+        )
+        return res.scalars().all()
+
+    @mutation.field("{{ bump_version_field }}")
+    async def bump(*_, id: str):
+        import datetime, json as _json
+        session = _[1].context["session"]
+        res = await session.execute(select({{ AuditedModel }}).where({{ AuditedModel }}.id == id))
+        obj = res.scalar_one_or_none()
+        if not obj:
+            return None
+        ver = getattr(obj, "version", 0) or 0
+        setattr(obj, "version", ver + 1)
+        setattr(obj, "updated_at", datetime.datetime.utcnow())
+        diff_payload = _json.dumps({"version": ver + 1})
+        await session.execute(
+            insert({{ HistoryModel }}).values(entity_id=id, version=ver+1, changed_at=datetime.datetime.utcnow(), diff=diff_payload)
+        )
+        await session.flush()
+        return obj
+
+    return query, mutation, node

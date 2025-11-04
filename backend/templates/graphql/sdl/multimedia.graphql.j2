@@ -1,0 +1,19 @@
+type {{ Attachment }} {
+  id: ID!
+  url: String!
+  mimeType: String
+  sizeBytes: Int
+  {{ owner_field }}: {{ OwnerEntity }}
+}
+
+type {{ OwnerEntity }} {
+  id: ID!
+  {% for f in owner_fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+  attachments(offset: Int = 0, limit: Int = 50, mimeLike: String): [{{ Attachment }}!]!
+}
+
+extend type Mutation {
+  {{ attach_field }}(ownerId: ID!, attachmentId: ID!): Boolean!
+  {{ detach_field }}(ownerId: ID!, attachmentId: ID!): Boolean!
+}

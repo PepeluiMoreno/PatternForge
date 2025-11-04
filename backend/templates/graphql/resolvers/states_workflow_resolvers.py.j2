@@ -1,0 +1,37 @@
+from ariadne import ObjectType
+from sqlalchemy import select
+{{ entity_import_line }}
+
+def mount_states_workflow_resolvers():
+    query = ObjectType("Query")
+    mutation = ObjectType("Mutation")
+    node = ObjectType("{{ WorkflowEntity }}")
+
+    @query.field("{{ workflow_entities_field }}")
+    async def resolve_entities(*_, state=None, offset: int = 0, limit: int = 50):
+        session = _[1].context["session"]
+        stmt = select({{ EntityModel }})
+        if state is not None:
+            stmt = stmt.where({{ EntityModel }}.state == state)
+        stmt = stmt.offset(offset).limit(limit)
+        res = await session.execute(stmt)
+        return res.scalars().all()
+
+    @query.field("{{ workflow_entity_field }}")
+    async def resolve_entity(*_, id: str):
+        session = _[1].context["session"]
+        res = await session.execute(select({{ EntityModel }}).where({{ EntityModel }}.id == id))
+        return res.scalar_one_or_none()
+
+    @mutation.field("{{ transition_field }}")
+    async def transition(*_, id: str, to: str):
+        session = _[1].context["session"]
+        res = await session.execute(select({{ EntityModel }}).where({{ EntityModel }}.id == id))
+        obj = res.scalar_one_or_none()
+        if not obj:
+            return None
+        obj.state = to  # Allowed transitions should be validated by generator-injected rules
+        await session.flush()
+        return obj
+
+    return query, mutation, node

@@ -1,0 +1,37 @@
+from ariadne import ObjectType
+from sqlalchemy import select
+{{ node_import_line }}
+
+def mount_hierarchy_resolvers():
+    query = ObjectType("Query")
+    node = ObjectType("{{ Node }}")
+
+    @query.field("{{ nodes_field }}")
+    async def resolve_nodes(*_, offset: int = 0, limit: int = 50):
+        session = _[1].context["session"]
+        res = await session.execute(select({{ NodeModel }}).offset(offset).limit(limit))
+        return res.scalars().all()
+
+    @query.field("{{ node_field }}")
+    async def resolve_node(*_, id: str):
+        session = _[1].context["session"]
+        res = await session.execute(select({{ NodeModel }}).where({{ NodeModel }}.id == id))
+        return res.scalar_one_or_none()
+
+    @node.field("parent")
+    async def resolve_parent(obj, info):
+        session = info.context["session"]
+        if not obj.{{ parent_fk }}:
+            return None
+        res = await session.execute(select({{ NodeModel }}).where({{ NodeModel }}.id == obj.{{ parent_fk }}))
+        return res.scalar_one_or_none()
+
+    @node.field("children")
+    async def resolve_children(obj, info, offset: int = 0, limit: int = 50):
+        session = info.context["session"]
+        res = await session.execute(
+            select({{ NodeModel }}).where({{ NodeModel }}.{{ parent_fk }} == obj.id).offset(offset).limit(limit)
+        )
+        return res.scalars().all()
+
+    return query, node

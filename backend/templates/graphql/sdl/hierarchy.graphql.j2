@@ -1,0 +1,12 @@
+type {{ Node }} {
+  id: ID!
+  {% for f in fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+  parent: {{ Node }}
+  children(offset: Int = 0, limit: Int = 50): [{{ Node }}!]!
+}
+
+extend type Query {
+  {{ nodes_field }}(offset: Int = 0, limit: Int = 50): [{{ Node }}!]!
+  {{ node_field }}(id: ID!): {{ Node }}
+}

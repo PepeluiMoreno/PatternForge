@@ -1,0 +1,32 @@
+from ariadne import ObjectType
+from sqlalchemy import select
+
+def mount_integrity_validation_resolvers(model_registry: dict):
+    mutation = ObjectType("Mutation")
+
+    @mutation.field("{{ validate_unique_field }}")
+    async def validate_unique(*_, **kwargs):
+        session = _[1].context["session"]
+        model = model_registry.get("{{ TargetModel }}")
+        if not model:
+            return False
+        from sqlalchemy import and_
+        conds = [getattr(model, k) == v for k, v in kwargs.items()]
+        stmt = select(model).where(and_(*conds))
+        exists = (await session.execute(stmt)).scalar_one_or_none()
+        return exists is None
+
+    @mutation.field("{{ validate_reference_field }}")
+    async def validate_reference(*_, field: str, value: str, reference: str, referenceField: str):
+        session = _[1].context["session"]
+        ref_model = model_registry.get(reference)
+        if not ref_model:
+            return False
+        ref_col = getattr(ref_model, referenceField, None)
+        if ref_col is None:
+            return False
+        stmt = select(ref_model).where(ref_col == value)
+        exists = (await session.execute(stmt)).scalar_one_or_none()
+        return exists is not None
+
+    return mutation

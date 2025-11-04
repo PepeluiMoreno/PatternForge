@@ -1,0 +1,18 @@
+type {{ Left }} {
+  id: ID!
+  {% for f in left_fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+  {{ rights_field }}(offset: Int = 0, limit: Int = 50): [{{ Right }}!]!
+}
+
+type {{ Right }} {
+  id: ID!
+  {% for f in right_fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+  {{ lefts_field }}(offset: Int = 0, limit: Int = 50): [{{ Left }}!]!
+}
+
+extend type Mutation {
+  {{ link_field }}(leftId: ID!, rightId: ID!): Boolean!
+  {{ unlink_field }}(leftId: ID!, rightId: ID!): Boolean!
+}

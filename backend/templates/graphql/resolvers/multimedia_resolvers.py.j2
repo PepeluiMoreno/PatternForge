@@ -1,0 +1,44 @@
+from ariadne import ObjectType
+from sqlalchemy import select
+{{ owner_import_line }}
+{{ attachment_import_line }}
+
+def mount_multimedia_resolvers():
+    mutation = ObjectType("Mutation")
+    owner = ObjectType("{{ OwnerEntity }}")
+
+    @owner.field("attachments")
+    async def resolve_attachments(obj, info, offset: int = 0, limit: int = 50, mimeLike: str=None):
+        session = info.context["session"]
+        stmt = select({{ AttachmentModel }}).where({{ AttachmentModel }}.{{ owner_fk }} == obj.id)
+        if mimeLike:
+            stmt = stmt.where({{ AttachmentModel }}.mimeType.ilike(f"%{mimeLike}%"))
+        stmt = stmt.offset(offset).limit(limit)
+        res = await session.execute(stmt)
+        return res.scalars().all()
+
+    @mutation.field("{{ attach_field }}")
+    async def attach(*_, ownerId: str, attachmentId: str):
+        session = _[1].context["session"]
+        res = await session.execute(select({{ AttachmentModel }}).where({{ AttachmentModel }}.id == attachmentId))
+        a = res.scalar_one_or_none()
+        if not a:
+            return False
+        a.{{ owner_fk }} = ownerId
+        await session.flush()
+        return True
+
+    @mutation.field("{{ detach_field }}")
+    async def detach(*_, ownerId: str, attachmentId: str):
+        session = _[1].context["session"]
+        res = await session.execute(select({{ AttachmentModel }}).where({{ AttachmentModel }}.id == attachmentId))
+        a = res.scalar_one_or_none()
+        if not a:
+            return False
+        if getattr(a, "{{ owner_fk }}") != ownerId:
+            return False
+        a.{{ owner_fk }} = None
+        await session.flush()
+        return True
+
+    return mutation, owner

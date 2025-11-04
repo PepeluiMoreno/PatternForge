@@ -1,0 +1,19 @@
+type {{ Entity }}Connection {
+  totalCount: Int!
+  edges: [{{ Entity }}Edge!]!
+  pageInfo: PageInfo!
+}
+
+type {{ Entity }}Edge {
+  node: {{ Entity }}!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  endCursor: String
+}
+
+extend type Query {
+  {{ entities_connection_field }}(after: String, first: Int = 50, search: String, orderBy: String, order: String = "ASC"): {{ Entity }}Connection!
+}

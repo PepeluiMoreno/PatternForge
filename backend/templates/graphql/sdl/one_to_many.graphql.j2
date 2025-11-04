@@ -1,0 +1,23 @@
+type {{ Parent }} {
+  id: ID!
+  {% for f in parent_fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+  {{ children_field }}(offset: Int = 0, limit: Int = 50): [{{ Child }}!]!
+}
+
+type {{ Child }} {
+  id: ID!
+  {% for f in child_fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+  {{ parent_field }}: {{ Parent }}
+}
+
+extend type Query {
+  {{ parents_field }}(offset: Int = 0, limit: Int = 50): [{{ Parent }}!]!
+  {{ parent_field_singular }}(id: ID!): {{ Parent }}
+}
+
+extend type Mutation {
+  {{ attach_field }}(parentId: ID!, childId: ID!): {{ Child }}!
+  {{ detach_field }}(childId: ID!): Boolean!
+}

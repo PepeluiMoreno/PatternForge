@@ -1,0 +1,20 @@
+enum {{ StateEnum }} {
+  {% for s in states %}{{ s }}
+  {% endfor %}
+}
+
+type {{ WorkflowEntity }} {
+  id: ID!
+  state: {{ StateEnum }}!
+  {% for f in fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+}
+
+extend type Query {
+  {{ workflow_entities_field }}(state: {{ StateEnum }}, offset: Int = 0, limit: Int = 50): [{{ WorkflowEntity }}!]!
+  {{ workflow_entity_field }}(id: ID!): {{ WorkflowEntity }}
+}
+
+extend type Mutation {
+  {{ transition_field }}(id: ID!, to: {{ StateEnum }}!): {{ WorkflowEntity }}!
+}

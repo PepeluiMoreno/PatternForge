@@ -1,0 +1,15 @@
+enum {{ RoleEnum }} {
+  {% for r in roles %}{{ r }}
+  {% endfor %}
+}
+
+type {{ User }} {
+  id: ID!
+  email: String!
+  roles: [{{ RoleEnum }}!]!
+}
+
+extend type Mutation {
+  {{ grant_role_field }}(userId: ID!, role: {{ RoleEnum }}!): Boolean!
+  {{ revoke_role_field }}(userId: ID!, role: {{ RoleEnum }}!): Boolean!
+}

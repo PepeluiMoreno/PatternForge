@@ -1,0 +1,4 @@
+extend type Mutation {
+  {{ validate_unique_field }}({% for f in unique_fields %}{{ f }}: String!{% if not loop.last %}, {% endif %}{% endfor %}): Boolean!
+  {{ validate_reference_field }}(field: String!, value: String!, reference: String!, referenceField: String!): Boolean!
+}

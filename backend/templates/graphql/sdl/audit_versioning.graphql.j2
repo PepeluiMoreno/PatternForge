@@ -1,0 +1,27 @@
+type {{ AuditedEntity }} {
+  id: ID!
+  createdAt: String
+  updatedAt: String
+  version: Int
+  {% for f in fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}
+  history(offset: Int = 0, limit: Int = 50): [{{ AuditedEntityHistory }}!]!
+}
+
+type {{ AuditedEntityHistory }} {
+  id: ID!
+  entityId: ID!
+  version: Int!
+  changedAt: String!
+  changedBy: String
+  diff: String
+}
+
+extend type Query {
+  {{ audited_entities_field }}(offset: Int = 0, limit: Int = 50): [{{ AuditedEntity }}!]!
+  {{ audited_entity_field }}(id: ID!): {{ AuditedEntity }}
+}
+
+extend type Mutation {
+  {{ bump_version_field }}(id: ID!): {{ AuditedEntity }}!
+}

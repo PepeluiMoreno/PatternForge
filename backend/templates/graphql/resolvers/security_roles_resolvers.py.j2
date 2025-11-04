@@ -1,0 +1,30 @@
+from ariadne import ObjectType
+from sqlalchemy import select, insert, delete
+{{ user_import_line }}
+{{ role_assignment_import_line }}
+
+def mount_security_roles_resolvers():
+    mutation = ObjectType("Mutation")
+
+    @mutation.field("{{ grant_role_field }}")
+    async def grant_role(*_, userId: str, role: str):
+        session = _[1].context["session"]
+        res = await session.execute(
+            select({{ RoleAssignmentModel }}).where(
+                ({{ RoleAssignmentModel }}.user_id == userId) & ({{ RoleAssignmentModel }}.role == role)
+            )
+        )
+        if res.scalar_one_or_none():
+            return True
+        await session.execute(insert({{ RoleAssignmentModel }}).values(user_id=userId, role=role))
+        return True
+
+    @mutation.field("{{ revoke_role_field }}")
+    async def revoke_role(*_, userId: str, role: str):
+        session = _[1].context["session"]
+        await session.execute(delete({{ RoleAssignmentModel }}).where(
+            ({{ RoleAssignmentModel }}.user_id == userId) & ({{ RoleAssignmentModel }}.role == role)
+        ))
+        return True
+
+    return mutation

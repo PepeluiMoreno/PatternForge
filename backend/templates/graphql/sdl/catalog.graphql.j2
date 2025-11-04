@@ -1,0 +1,25 @@
+type {{ Entity }} {
+  id: ID!
+  {% if code_field %}{{ code_field }}: String!{% endif %}
+  name: String!
+  {% if extra_fields %}{% for f in extra_fields %}{{ f.name }}: {{ f.type }}
+  {% endfor %}{% endif %}
+}
+
+type Query {
+  {{ entities_field }}(search: String, offset: Int = 0, limit: Int = 50, orderBy: String, order: String = "ASC"): [{{ Entity }}!]!
+  {{ entity_field }}(id: ID!): {{ Entity }}
+}
+
+input {{ Entity }}Input {
+  {% if code_field %}{{ code_field }}: String!{% endif %}
+  name: String!
+  {% if extra_fields %}{% for f in extra_fields %}{{ f.name }}: {{ f.inputType }}
+  {% endfor %}{% endif %}
+}
+
+type Mutation {
+  {{ create_field }}(input: {{ Entity }}Input!): {{ Entity }}!
+  {{ update_field }}(id: ID!, input: {{ Entity }}Input!): {{ Entity }}
+  {{ delete_field }}(id: ID!): Boolean!
+}
