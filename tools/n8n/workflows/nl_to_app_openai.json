@@ -1,0 +1,183 @@
+{
+  "name": "PatternForge \u00b7 NL \u2192 Model \u2192 Code (OpenAI)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "Manual Trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "PF_ROOT",
+              "value": "/repo"
+            },
+            {
+              "name": "domain",
+              "value": "We need a small app to manage projects and tasks.\nEach Project has a name, code, and optional description, and many Tasks.\nEach Task has title, done flag, due date, and belongs to exactly one Project.\nWe need a dynamic catalog for TaskStatus with values: TODO, DOING, DONE (active).\n"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "Set Vars",
+      "name": "Set Vars",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "type": "system",
+            "text": "You are PatternForge, an assistant that converts a NATURAL LANGUAGE domain description into a canonical application model JSON.\nSTRICT OUTPUT: JSON only. Do not include explanations.\nThe JSON MUST match this structure:\n{\n  \"app\": {\n    \"name\": \"string\",\n    \"description\": \"string\",\n    \"entities\": [\n      {\n        \"name\": \"PascalCaseSingular\",\n        \"attributes\": [\n          {\"name\":\"camelCase\",\"type\":\"string|text|int|float|bool|date|datetime|json\",\"nullable\":true|false,\"unique\":true|false,\"default\":null|<literal>}\n        ],\n        \"relations\": [\n          {\"type\":\"oneToOne|oneToMany|manyToMany|hierarchy\",\"with\":\"EntityName\",\"field\":\"camelCase\",\"through\":\"<JoinEntityIfAny>\",\"onDelete\":\"restrict|cascade|setNull\"}\n        ],\n        \"catalogs\": [\n          {\"field\":\"camelCase\",\"catalog\":\"CatalogName\",\"codeField\":\"code\",\"labelField\":\"name\"}\n        ]\n      }\n    ],\n    \"catalogs\": [\n      {\"name\":\"CatalogName\",\"items\":[{\"code\":\"CODE\",\"name\":\"Label\",\"isActive\":true}]}\n    ]\n  }\n}\nRULES:\n- Use English identifiers.\n- Catalogs are dynamic ENUMs (\u2264 20 items). Put them in app.catalogs.\n- Entities reference catalogs via 'catalogs' array in each entity with 'field' names.\n- Avoid domain-specific logic; only structure and types.\n"
+          },
+          {
+            "type": "user",
+            "text": "Domain description:\\n{{$json.domain}}"
+          }
+        ],
+        "responsePropertyName": "modelJson",
+        "jsonOutput": true
+      },
+      "id": "OpenAI \u2192 Model",
+      "name": "OpenAI \u2192 Model",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "position": [
+        640,
+        300
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "resource": "chat",
+        "model": "gpt-4o-mini",
+        "messages": [
+          {
+            "type": "system",
+            "text": "You will receive a canonical application model JSON (see PatternForge schema).\nYour job is to generate minimal but production-grade BACKEND and FRONTEND files.\n\nOUTPUT FORMAT (JSON only):\n{\n  \"files\": [\n    {\"path\": \"backend/schema.graphql\", \"content\": \"<SDL>\"},\n    {\"path\": \"backend/resolvers.py\", \"content\": \"<python ariadne resolvers>\"},\n    {\"path\": \"frontend/composables/useApi.js\", \"content\": \"<vue composable>\"},\n    {\"path\": \"frontend/components/EntityList.vue\", \"content\": \"<vue component>\"}\n  ]\n}\n\nREQUIREMENTS:\n- GraphQL: Ariadne, schema-first. Types for each entity, queries for list/detail, basic mutations (create/update/delete).\n- Catalogs: generate Catalog types, queries, and seed comment.\n- Resolvers: python, basic session stub (SessionLocal), TODO comments where needed.\n- Vue 3: one composable per entity for list/detail; one List.vue component per entity.\n- Keep code clean, English identifiers, and no external chatter.\n"
+          },
+          {
+            "type": "user",
+            "text": "Model JSON:\\n{{$json[\"modelJson\"]}}\\nGenerate files now."
+          }
+        ],
+        "responsePropertyName": "filesJson",
+        "jsonOutput": true
+      },
+      "id": "OpenAI \u2192 Files",
+      "name": "OpenAI \u2192 Files",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 4,
+      "position": [
+        860,
+        300
+      ],
+      "credentials": {}
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "commandArguments": "-lc",
+        "input": "const files = $json[\"filesJson\"].files || [];\nlet script = \"set -e\\n\";\nfor (const f of files) {\n  const p = f.path.replace(/^\\/+/, \"\");\n  script += `mkdir -p \\\"$PF_ROOT/${{p}}\\\" >/dev/null 2>&1 || true\\n`;\n}\n// Better: write files via heredocs\nscript += \"\\n\";\nfor (const f of files) {\n  const fullPath = `'$PF_ROOT'/'${f.path}'`;\n  script += `mkdir -p \\\"$(dirname ${fullPath})\\\"\\n`;\n  script += `cat > ${fullPath} <<'EOF'\\n${f.content}\\nEOF\\n`;\n}\nreturn { data: script };\n",
+        "options": {}
+      },
+      "id": "Build Bash Script",
+      "name": "Build Bash Script",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "bash",
+        "commandArguments": "-lc",
+        "input": "={{$json.data}}"
+      },
+      "id": "Execute Bash",
+      "name": "Execute Bash",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Vars",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Vars": {
+      "main": [
+        [
+          {
+            "node": "OpenAI \u2192 Model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI \u2192 Model": {
+      "main": [
+        [
+          {
+            "node": "OpenAI \u2192 Files",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI \u2192 Files": {
+      "main": [
+        [
+          {
+            "node": "Build Bash Script",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Bash Script": {
+      "main": [
+        [
+          {
+            "node": "Execute Bash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

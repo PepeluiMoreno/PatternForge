@@ -1,3 +1,3 @@
-# Pattern 02 · One-to-One Relationship
+# Pattern 03 · Many-to-Many Relationship
 
 ... (full content previously provided) ...

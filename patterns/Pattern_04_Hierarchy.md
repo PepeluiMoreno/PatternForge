@@ -1,0 +1,3 @@
+# Pattern 04 · Hierarchy (Self-Reference Pattern)
+
+... (full content previously provided) ...

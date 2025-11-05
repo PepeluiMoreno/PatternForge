@@ -1,0 +1,4 @@
+We need a small app to manage projects and tasks.
+Each Project has a name, code, and optional description, and many Tasks.
+Each Task has title, done flag, due date, and belongs to exactly one Project.
+We need a dynamic catalog for TaskStatus with values: TODO, DOING, DONE (active).
