@@ -1,0 +1,88 @@
+version: "3.9"
+
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=${N8N_HOST}
+      - N8N_PORT=${N8N_PORT-5678}
+      - N8N_PROTOCOL=${N8N_PROTOCOL-http}
+      - WEBHOOK_URL=${WEBHOOK_URL}
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE-Europe/Madrid}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      # Optional: enable basic auth
+      - N8N_BASIC_AUTH_ACTIVE=${N8N_BASIC_AUTH_ACTIVE-false}
+      - N8N_BASIC_AUTH_USER=${N8N_BASIC_AUTH_USER-}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_BASIC_AUTH_PASSWORD-}
+      # Mount repo into /repo so workflows can write files
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL-}
+    ports:
+      - "${N8N_PORT-5678}:5678"
+    volumes:
+      - ./../..:/repo
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks: [patternforge]
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    environment:
+      - OLLAMA_KEEP_ALIVE=24h
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+    networks: [patternforge]
+
+  # Optional Vector DB for RAG (enable by adding --profile rag to `docker compose up`)
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    profiles: ["rag"]
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    networks: [patternforge]
+
+  # Optional helper to serve a tiny RAG API (embeddings + retrieval stubs)
+  rag-helper:
+    build:
+      context: ../rag-helper
+      dockerfile: Dockerfile
+    container_name: rag-helper
+    profiles: ["rag"]
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL-nomic-embed-text}
+      - PORT=8000
+    depends_on:
+      qdrant:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    networks: [patternforge]
+
+networks:
+  patternforge:
+    driver: bridge
+
+volumes:
+  n8n_data:
+  ollama_models:
+  qdrant_data:
