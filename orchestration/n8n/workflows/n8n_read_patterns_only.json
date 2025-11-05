@@ -1,0 +1,101 @@
+{
+  "name": "Read Patterns (Only)",
+  "nodes": [
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "PATTERNS_DIR",
+              "value": "/repo/patterns"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "Set_Patterns_Dir",
+      "name": "Set Patterns Dir",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "command": "bash -lc 'DIR=\"{{$json[\"PATTERNS_DIR\"]}}\"; shopt -s nullglob; for f in \"$DIR\"/*.md; do echo \"---FILE:$f---\"; cat \"$f\"; echo -e \"\\n---END---\"; done'",
+        "shell": "bash"
+      },
+      "id": "Exec_List_Read",
+      "name": "Exec List+Read",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 2,
+      "position": [
+        600,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "\n            const out = $json[\"stdout\"] || \"\";\n            const items = [];\n            const parts = out.split(/\\n---FILE:/).filter(x => x.trim().length);\n            for (const part of parts) {\n              const idx = part.indexOf('---\\n');\n              if (idx === -1) continue;\n              const header = part.slice(0, idx).trim();\n              const content = part.slice(idx + 4);\n              const fname = header.replace(/---$/, '').trim();\n              const endIdx = content.lastIndexOf('\\n---END---');\n              const body = endIdx >= 0 ? content.slice(0, endIdx) : content;\n              items.push({ json: { filename: fname, content: body, length: body.length } });\n            }\n            return items;\n            "
+      },
+      "id": "Parse_Output",
+      "name": "Parse Output",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "\n            const crypto = require('crypto');\n            return items.map(item => {\n              const buf = Buffer.from(item.json.content, 'utf-8');\n              const hash = crypto.createHash('sha256').update(buf).digest('hex');\n              item.json.sha256 = hash;\n              return item;\n            });\n            "
+      },
+      "id": "Hash_Content",
+      "name": "Hash Content",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Set Patterns Dir": {
+      "main": [
+        [
+          {
+            "node": "Exec List+Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Exec List+Read": {
+      "main": [
+        [
+          {
+            "node": "Parse Output",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Output": {
+      "main": [
+        [
+          {
+            "node": "Hash Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

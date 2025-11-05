@@ -1,0 +1,110 @@
+{
+  "name": "Patterns RAG Search (Webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "patterns/search",
+        "options": {
+          "responseData": "={{$json[\"matches\"]}}",
+          "responseCode": 200,
+          "responseHeaders": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        }
+      },
+      "id": "Webhook",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        300,
+        300
+      ],
+      "webhookId": "patterns-search"
+    },
+    {
+      "parameters": {
+        "functionCode": "const q=$json[\"q\"];const top=Number($json[\"top_k\"]??5);if(!q||typeof q!==\"string\"){return[{json:{error:\"Missing 'q' in body\"}}];}return[{json:{q,top_k:isNaN(top)?5:top}}];"
+      },
+      "id": "Validate_Input",
+      "name": "Validate Input",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        580,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://rag-helper:8000/search",
+        "jsonParameters": true,
+        "sendBody": true,
+        "contentType": "json",
+        "options": {
+          "timeout": 60000
+        },
+        "bodyParametersJson": "{\"text\":\"{{$json[\\\"q\\\"]}}\",\"top_k\":{{$json[\\\"top_k\\\"]}}}"
+      },
+      "id": "HTTP_Search",
+      "name": "HTTP Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        860,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data=$json;const matches=Array.isArray(data)?data:(Array.isArray(data.body)?data.body:(data.body||data));return[{json:{matches}}];"
+      },
+      "id": "Normalize_Response",
+      "name": "Normalize Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1140,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "HTTP Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Search": {
+      "main": [
+        [
+          {
+            "node": "Normalize Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

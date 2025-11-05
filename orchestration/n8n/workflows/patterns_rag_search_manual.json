@@ -1,0 +1,109 @@
+{
+  "name": "Patterns RAG Search (Manual)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "Manual_Trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        300,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "q",
+              "value": "dynamic enum catalogs used by many entities"
+            },
+            {
+              "name": "top_k",
+              "value": "5"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "Set_Query",
+      "name": "Set Query",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2,
+      "position": [
+        560,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "http://rag-helper:8000/search",
+        "jsonParameters": true,
+        "sendBody": true,
+        "contentType": "json",
+        "options": {
+          "timeout": 60000
+        },
+        "bodyParametersJson": "{\"text\":\"{{$json[\\\"q\\\"]}}\",\"top_k\":{{$json[\\\"top_k\\\"]}}}"
+      },
+      "id": "HTTP_Search",
+      "name": "HTTP Search",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        840,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "functionCode": "const data=$json;const matches=Array.isArray(data)?data:(Array.isArray(data.body)?data.body:(data.body||data));return[{json:{matches}}];"
+      },
+      "id": "Normalize_Response",
+      "name": "Normalize Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Set Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Query": {
+      "main": [
+        [
+          {
+            "node": "HTTP Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Search": {
+      "main": [
+        [
+          {
+            "node": "Normalize Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
